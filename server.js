@@ -658,7 +658,7 @@ app.post("/api/user/login", async (req, res) => {
         success: true,
         message: 'Login bem-sucedido!',
         token: token,
-        username: user.Nome,  // Supondo que o nome do usuário está na coluna 'Nome'
+        username: user.NomeCompleto,  // Supondo que o nome do usuário está na coluna 'Nome'
         institution: user.instituicaoNome,
         role: 'Visualizador',
         birthDate: user.Data_de_Nascimento,
