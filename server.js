@@ -299,7 +299,45 @@ app.put('/instituicoes/:id', async (req, res) => {
       [nome, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento, bairro, cidade, estado, pais, cep, instituicaoId]
     );
 
-    // Atualizar outras tabelas (Contatos, Unidades, Setores, Cargos, Usuarios) se necessário
+    // Atualizar tabela Contatos
+    for (const contato of contatos) {
+      await connection.query(
+        'UPDATE Contatos SET categoria = ?, categoriaEspecifica = ?, nomeCompleto = ?, telefone = ?, instituicaoNome = ? WHERE instituicaoId = ?',
+        [contato.categoria, contato.categoriaEspecifica, contato.nomeCompleto, contato.telefone, nome, instituicaoId]
+      );
+    }
+
+    // Atualizar tabela Unidades
+    for (const unidade of unidades) {
+      await connection.query(
+        'UPDATE Unidades SET unidade = ?, instituicaoNome = ? WHERE instituicaoId = ?',
+        [unidade.unidade, nome, instituicaoId]
+      );
+    }
+
+    // Atualizar tabela Setores
+    for (const setor of setores) {
+      await connection.query(
+        'UPDATE Setores SET setor = ?, instituicaoNome = ? WHERE instituicaoId = ?',
+        [setor.setor, nome, instituicaoId]
+      );
+    }
+
+    // Atualizar tabela Cargos
+    for (const cargo of cargos) {
+      await connection.query(
+        'UPDATE Cargos SET cargo = ?, instituicaoNome = ? WHERE instituicaoId = ?',
+        [cargo.cargo, nome, instituicaoId]
+      );
+    }
+
+    // Atualizar tabela Usuarios
+    for (const usuario of usuarios) {
+      await connection.query(
+        'UPDATE Usuarios SET nome = ?, identificador = ?, senha = ?, acesso = ?, instituicaoNome = ? WHERE instituicaoId = ?',
+        [usuario.nome, usuario.identificador, usuario.senha, usuario.acesso, nome, instituicaoId]
+      );
+    }
 
     res.status(200).send('Instituição atualizada com sucesso!');
   } catch (error) {
@@ -309,6 +347,7 @@ app.put('/instituicoes/:id', async (req, res) => {
     connection.release();
   }
 });
+
 
 app.delete('/instituicoes/:id', async (req, res) => {
   console.log('Objeto completo de parâmetros:', req.params); // Log dos parâmetros
