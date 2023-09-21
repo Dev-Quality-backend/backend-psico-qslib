@@ -232,18 +232,21 @@ app.post('/instituicoes', async (req, res) => {
       estado,
       pais,
       cep,
-      contatos,
-      unidades,
-      setores,
-      cargos,
-      usuarios,
     } = req.body;
+
+    // Validation
+    if (!nome || !cnpj || !inscricaoEstadual || !razaoSocial || !logradouro || !numero || !bairro || !cidade || !estado || !pais || !cep) {
+      return res.status(400).send('Todos os campos são obrigatórios');
+    }
+
+    console.log("Dados a serem inseridos:", req.body);  // Debug log
 
     // Inserting data into Instituicoes
     const [instituicaoResult] = await connection.query(
       'INSERT INTO Instituicoes (instituicao, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento, bairro, cidade, estado, pais, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [nome, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento, bairro, cidade, estado, pais, cep]
     );
+
 
     const instituicaoId = instituicaoResult.insertId;
     const instituicaoNome = nome; // Nome da instituição
