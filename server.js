@@ -200,89 +200,66 @@ app.post('/login', async (req, res) => {
   }
 });
 
-
 app.post('/instituicoes', async (req, res) => {
   const connection = await pool.getConnection();
 
   try {
-    // Begin transaction
+    // Iniciar transação
     await connection.beginTransaction();
 
-    // Destructuring data from the request body
-    const { cnpj } = req.body;
+    // Desestruturação de dados do corpo da requisição
+    const {
+      nome, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero,
+      complemento, bairro, cidade, estado, pais, cep,
+      contatos, unidades, setores, cargos, usuarios
+    } = req.body;
 
-    // Check if an institution with the same CNPJ already exists
+    // Verificar se os campos obrigatórios estão presentes
+    if (!nome || !cnpj) {
+      return res.status(400).send('Nome da instituição e CNPJ são campos obrigatórios.');
+    }
+
+    // Verificar se uma instituição com o mesmo CNPJ já existe
     const [existingInstitutions] = await connection.query('SELECT * FROM Instituicoes WHERE cnpj = ?', [cnpj]);
     if (existingInstitutions.length > 0) {
       return res.status(400).send('Erro ao cadastrar Instituição, já existe uma instituição com esse CNPJ');
     }
-    // Início da transação
-    await connection.beginTransaction();
 
-    // Destructuring data from the request body
-    const {
-      nome,
-      inscricaoEstadual,
-      razaoSocial,
-      logradouro,
-      numero,
-      complemento,
-      bairro,
-      cidade,
-      estado,
-      pais,
-      cep,
-    } = req.body;
-
-    // Validation
-    if (!nome || !cnpj || !inscricaoEstadual || !razaoSocial || !logradouro || !numero || !bairro || !cidade || !estado || !pais || !cep) {
-      return res.status(400).send('Todos os campos são obrigatórios');
-    }
-
-    console.log("Dados a serem inseridos:", req.body);  // Debug log
-
-    // Inserting data into Instituicoes
+    // Inserir dados na tabela Instituicoes
     const [instituicaoResult] = await connection.query(
       'INSERT INTO Instituicoes (instituicao, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento, bairro, cidade, estado, pais, cep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [nome, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento, bairro, cidade, estado, pais, cep]
     );
 
-
     const instituicaoId = instituicaoResult.insertId;
     const instituicaoNome = nome; // Nome da instituição
 
-    // Inserting data into Contatos
+    // Inserir dados na tabela Contatos
     for (const contato of contatos) {
-      
-      console.log('Inserindo contato:', instituicaoId, instituicaoNome, contato.categoria, contato.categoriaEspecifica, contato.nomeCompleto, contato.telefone);
- 
       await connection.query(
         'INSERT INTO Contatos (instituicaoId, categoria, categoriaEspecifica, nomeCompleto, telefone, instituicaoNome) VALUES (?, ?, ?, ?, ?, ?)',
-        [instituicaoId,contato.categoria, contato.categoriaEspecifica, contato.nomeCompleto, contato.telefone,instituicaoNome]
+        [instituicaoId, contato.categoria, contato.categoriaEspecifica, contato.nomeCompleto, contato.telefone, instituicaoNome]
       );
     }
 
-    // Inserting data into Unidades
+    // Inserir dados na tabela Unidades
     for (const unidade of unidades) {
-      await connection.query('INSERT INTO Unidades (instituicaoId,instituicaoNome, unidade) VALUES (?, ?, ?)', [instituicaoId,instituicaoNome, unidade]);
+      await connection.query('INSERT INTO Unidades (instituicaoId, instituicaoNome, unidade) VALUES (?, ?, ?)', [instituicaoId, instituicaoNome, unidade.unidade]);
     }
 
-    // Inserting data into Setores
+    // Inserir dados na tabela Setores
     for (const setor of setores) {
-      await connection.query('INSERT INTO Setores (instituicaoId,instituicaoNome, setor) VALUES (?, ?, ?)', [instituicaoId, instituicaoNome,setor]);
+      await connection.query('INSERT INTO Setores (instituicaoId, instituicaoNome, setor) VALUES (?, ?, ?)', [instituicaoId, instituicaoNome, setor.setor]);
     }
 
-    // Inserting data into Cargos
+    // Inserir dados na tabela Cargos
     for (const cargo of cargos) {
-      await connection.query('INSERT INTO Cargos (instituicaoId,instituicaoNome, Cargo) VALUES (?, ?, ?)', [instituicaoId, instituicaoNome,cargo]);
+      await connection.query('INSERT INTO Cargos (instituicaoId, instituicaoNome, Cargo) VALUES (?, ?, ?)', [instituicaoId, instituicaoNome, cargo.cargo]);
     }
 
-    // Inserting data into Usuarios
+    // Inserir dados na tabela Usuarios
     for (const usuario of usuarios) {
-      
-      console.log('Inserindo usuário:', instituicaoId, instituicaoNome, usuario.nome, usuario.identificador, usuario.senha, 'Administrador');
-  
-      await connection.query('INSERT INTO Usuarios (instituicaoId,instituicaoNome, nome, identificador, senha, acesso) VALUES (?, ?, ?, ?, ?, ?)', [
+      await connection.query('INSERT INTO Usuarios (instituicaoId, instituicaoNome, nome, identificador, senha, acesso) VALUES (?, ?, ?, ?, ?, ?)', [
         instituicaoId,
         instituicaoNome,
         usuario.nome,
@@ -292,12 +269,11 @@ app.post('/instituicoes', async (req, res) => {
       ]);
     }
 
- // Confirmação da transação
+    // Confirmação da transação
     await connection.commit();
-
     res.status(201).send('Instituição registrada com sucesso!');
   } catch (error) {
-    // Desfaz a transação
+    // Desfazer a transação
     await connection.rollback();
     console.error(error);
     res.status(500).send('Erro ao registrar a instituição');
@@ -305,6 +281,7 @@ app.post('/instituicoes', async (req, res) => {
     connection.release();
   }
 });
+
 
 app.put('/instituicoes/:id', async (req, res) => {
   const connection = await pool.getConnection();
