@@ -508,7 +508,6 @@ app.get('/usuarios_instituicao', async (req, res) => {
   }
 });
 
-
 app.post('/salvar-instituicao', async (req, res) => {
   const connection = await pool.getConnection();
   try {
@@ -535,26 +534,26 @@ app.post('/salvar-instituicao', async (req, res) => {
     const tables = { Cargos: cargos, Contatos: contatos, Setores: setores, Unidades: unidades };
     for (const [table, data] of Object.entries(tables)) {
       const field = table.slice(0, -1).toLowerCase();
-      const query = `UPDATE ${table} SET ${field} = ? WHERE instituicaoId = ?;`;
+      const query = `UPDATE ${table} SET ${field} = ? WHERE instituicaoId = ? AND id = ?;`;
 
       for (const item of data) {
-        if (item.instituicaoId === undefined || item[field] === undefined) {
+        if (item.instituicaoId === undefined || item[field] === undefined || item.id === undefined) {
           console.error(`Um ou mais campos estão indefinidos para tabela ${table}:`, item);
           continue;
         }
-        await connection.execute(query, [item[field], item.instituicaoId]);
+        await connection.execute(query, [item[field], item.instituicaoId, item.id]);
       }
     }
 
     // Atualizar a tabela Usuarios
-    const usuariosQuery = `UPDATE Usuarios SET nome = ?, identificador = ?, senha = ?, acesso = ? WHERE instituicaoId = ?;`;
+    const usuariosQuery = `UPDATE Usuarios SET nome = ?, identificador = ?, senha = ?, acesso = ? WHERE instituicaoId = ? AND id = ?;`;
     for (const item of usuarios) {
-      const { nome, identificador, senha, acesso, instituicaoId } = item;
-      if ([nome, identificador, senha, acesso, instituicaoId].includes(undefined)) {
+      const { nome, identificador, senha, acesso, instituicaoId, id } = item;
+      if ([nome, identificador, senha, acesso, instituicaoId, id].includes(undefined)) {
         console.error('Um ou mais campos estão indefinidos:', item);
         continue;
       }
-      await connection.execute(usuariosQuery, [nome, identificador, senha, acesso, instituicaoId]);
+      await connection.execute(usuariosQuery, [nome, identificador, senha, acesso, instituicaoId, id]);
     }
 
     await connection.commit(); // Commit da transação
