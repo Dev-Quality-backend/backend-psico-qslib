@@ -376,6 +376,26 @@ app.delete('/instituicoes/:id', async (req, res) => {
 });
 
 
+
+
+
+
+
+
+app.get('/instituicoes', async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const [instituicoes] = await connection.query('SELECT * FROM Instituicoes');
+    res.status(200).json(instituicoes);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Erro ao buscar as instituições');
+  } finally {
+    connection.release();
+  }
+});
+
 app.get('/instituicao-detalhes', async (req, res) => {
   const connection = await pool.getConnection();
   const instituicaoId = req.query.instituicaoId;
@@ -490,42 +510,61 @@ app.get('/usuarios_instituicao', async (req, res) => {
 
 
 app.post('/salvar-instituicao', async (req, res) => {
+  const connection = await pool.getConnection();
   try {
-    const { instituicoes, cargos, contatos, setores, unidades, usuarios } = req.body;
-    const connection = await pool.getConnection();
+    await connection.beginTransaction(); // Iniciar a transação
 
-    if (instituicoes && instituicoes.length > 0) {
-      const instituicoesData = instituicoes[0];
-      const instituicoesValues = Object.values(instituicoesData);
-      const instituicoesQuery = `UPDATE Instituicoes SET instituicao = ?, cnpj = ?, inscricaoEstadual = ?, razaoSocial = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?, pais = ?, cep = ? WHERE id = ?;`;
-      await connection.execute(instituicoesQuery, instituicoesValues);
+    const { instituicoes, cargos, contatos, setores, unidades, usuarios } = req.body;
+
+    // Validar os dados recebidos
+    if (!instituicoes || instituicoes.length === 0) {
+      throw new Error('Instituicoes é indefinido ou vazio.');
     }
 
-    const updateQueries = {
-      Cargos: 'UPDATE Cargos SET cargo = ? WHERE id = ? AND instituicaoId = ?;',
-      Contatos: 'UPDATE Contatos SET categoria = ?, categoriaEspecifica = ?, nomeCompleto = ?, telefone = ? WHERE id = ? AND instituicaoId = ?;',
-      Setores: 'UPDATE Setores SET setor = ? WHERE id = ? AND instituicaoId = ?;',
-      Unidades: 'UPDATE Unidades SET unidade = ? WHERE id = ? AND instituicaoId = ?;',
-      Usuarios: 'UPDATE Usuarios SET nome = ?, identificador = ?, senha = ?, acesso = ? WHERE id = ? AND instituicaoId = ?;'
-    };
+    const instituicoesData = instituicoes[0];
+    if (!instituicoesData.id) {
+      throw new Error('ID da Instituição não fornecido.');
+    }
 
-    for (const [table, query] of Object.entries(updateQueries)) {
-      const data = req.body[table.toLowerCase()];
+    // Atualizar a tabela Instituicoes
+    const instituicoesValues = Object.values(instituicoesData);
+    const instituicoesQuery = `UPDATE Instituicoes SET instituicao = ?, cnpj = ?, inscricaoEstadual = ?, razaoSocial = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?, pais = ?, cep = ? WHERE id = ?;`;
+    await connection.execute(instituicoesQuery, instituicoesValues);
+
+    // Atualizar outras tabelas (Cargos, Contatos, Setores, Unidades)
+    const tables = { Cargos: cargos, Contatos: contatos, Setores: setores, Unidades: unidades };
+    for (const [table, data] of Object.entries(tables)) {
+      const field = table.slice(0, -1).toLowerCase();
+      const query = `UPDATE ${table} SET ${field} = ? WHERE instituicaoId = ?;`;
+
       for (const item of data) {
-        const values = Object.values(item).filter(value => value !== undefined);
-        if (values.length < Object.keys(item).length) {
-          console.error(`Campos indefinidos na tabela ${table}:`, item);
+        if (item.instituicaoId === undefined || item[field] === undefined) {
+          console.error(`Um ou mais campos estão indefinidos para tabela ${table}:`, item);
           continue;
         }
-        await connection.execute(query, values);
+        await connection.execute(query, [item[field], item.instituicaoId]);
       }
     }
 
-    connection.release();
+    // Atualizar a tabela Usuarios
+    const usuariosQuery = `UPDATE Usuarios SET nome = ?, identificador = ?, senha = ?, acesso = ? WHERE instituicaoId = ?;`;
+    for (const item of usuarios) {
+      const { nome, identificador, senha, acesso, instituicaoId } = item;
+      if ([nome, identificador, senha, acesso, instituicaoId].includes(undefined)) {
+        console.error('Um ou mais campos estão indefinidos:', item);
+        continue;
+      }
+      await connection.execute(usuariosQuery, [nome, identificador, senha, acesso, instituicaoId]);
+    }
+
+    await connection.commit(); // Commit da transação
     res.status(200).json({ success: true });
   } catch (error) {
+    await connection.rollback(); // Reverter a transação
     console.error('Erro ao salvar as alterações:', error);
     res.status(500).send('Erro ao salvar as alterações');
+  } finally {
+    connection.release(); // Liberar a conexão
   }
 });
 
@@ -638,7 +677,7 @@ app.post("/api/user/login", async (req, res) => {
         success: true,
         message: 'Login bem-sucedido!',
         token: token,
-        username: user.NomeCompleto,  // Supondo que o nome do usuário está na coluna 'Nome'
+        username: user.Nome,  // Supondo que o nome do usuário está na coluna 'Nome'
         institution: user.instituicaoNome,
         role: 'Visualizador',
         birthDate: user.Data_de_Nascimento,
@@ -754,11 +793,11 @@ app.delete('/programas/:id', async (req, res) => {
 
 
 app.post('/api/verifyUser', async (req, res) => {
-  const { Email } = req.body;
+  const { Nome, Email } = req.body;
   try {
     const [rows] = await pool.execute(
-      'SELECT * FROM cadastro_clientes WHERE Email = ?',
-      [Email]
+      'SELECT * FROM cadastro_clientes WHERE  Nome = ? AND Email = ?',
+      [Nome, Email]
     );
     if (rows.length > 0) {
       res.json({ success: true });
@@ -771,16 +810,16 @@ app.post('/api/verifyUser', async (req, res) => {
 });
 
 app.post('/api/registerPassword', async (req, res) => {
-  const { Email, Senha } = req.body;
+  const { Nome, Email, Senha } = req.body;
   
-  if ( !Email || !Senha) {
+  if (!Nome || !Email || !Senha) {
     return res.status(400).json({ success: false, message: 'Dados incompletos.' });
   }
   
   try {
     await pool.execute(
-      'UPDATE cadastro_clientes SET senha = ? WHERE Email = ?',
-      [Senha, Email]
+      'UPDATE cadastro_clientes SET senha = ? WHERE Nome = ? AND Email = ?',
+      [Senha, Nome, Email]
     );
     res.json({ success: true });
   } catch (error) {
