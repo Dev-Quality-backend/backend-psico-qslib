@@ -488,12 +488,11 @@ app.get('/usuarios_instituicao', async (req, res) => {
   }
 });
 
-app.post('/salvar-instituicao', async (req, res) => {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();  // Iniciar a transação
 
+app.post('/salvar-instituicao', async (req, res) => {
+  try {
     const { instituicoes, cargos, contatos, setores, unidades, usuarios } = req.body;
+    const connection = await pool.getConnection();
 
     if (instituicoes && instituicoes.length > 0) {
       const instituicoesData = instituicoes[0];
@@ -522,15 +521,11 @@ app.post('/salvar-instituicao', async (req, res) => {
       }
     }
 
-    await connection.commit();  // Finalizar a transação se tudo ocorreu bem
+    connection.release();
     res.status(200).json({ success: true });
-
   } catch (error) {
-    await connection.rollback();  // Reverter a transação em caso de erro
     console.error('Erro ao salvar as alterações:', error);
     res.status(500).send('Erro ao salvar as alterações');
-  } finally {
-    connection.release();
   }
 });
 
