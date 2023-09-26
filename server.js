@@ -17,9 +17,8 @@ const app = express();
 const pool = mysql.createPool({
   host: '129.148.55.118',
   user: 'QualityAdmin',
-  password: 'Suus0220##',
+  password: 'Seg@1977',
   database: 'Psico-qslib',
-  connectionLimit: 10,
 });
 
 
@@ -283,9 +282,9 @@ app.post('/instituicoes', async (req, res) => {
 });
 
 
-app.put('/instituicoes/:id', async (req, res) => {
+app.put('/instituicoes/:nome', async (req, res) => {
   const connection = await pool.getConnection();
-  const instituicaoId = req.params.id;
+  const instituicaoNome = req.params.id;
 
   const {
     nome, cnpj, inscricaoEstadual, razaoSocial, logradouro, numero, complemento,
